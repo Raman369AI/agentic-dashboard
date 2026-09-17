@@ -23,6 +23,15 @@ export async function removeAgent(id: string): Promise<void> {
   if (!response.ok) throw new Error('Could not remove this agent.')
 }
 
+export async function invokeRemoteAgent(id: string, prompt: string, signal?: AbortSignal): Promise<unknown[]> {
+  const response = await fetch(`/api/agents/${id}/invoke`, {
+    method: 'POST', headers: jsonHeaders, body: JSON.stringify({ prompt }), signal,
+  })
+  const payload = await response.json().catch(() => ({})) as { detail?: string; events?: unknown[] }
+  if (!response.ok) throw new Error(payload.detail || 'The remote agent invocation failed.')
+  return payload.events || []
+}
+
 export async function streamAgent(
   threadId: string,
   messages: { id: string; role: string; content: string }[],
