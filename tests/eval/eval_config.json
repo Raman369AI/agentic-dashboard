@@ -1,0 +1,29 @@
+{
+  "criteria": {
+    "tool_trajectory_avg_score": {
+      "threshold": 1.0,
+      "match_type": "IN_ORDER"
+    },
+    "rubric_based_final_response_quality_v1": {
+      "threshold": 0.8,
+      "judge_model_options": {
+        "judge_model": "gemini-3-flash-preview",
+        "num_samples": 1
+      },
+      "rubrics": [
+        {
+          "rubric_id": "relevance",
+          "rubric_content": { "text_property": "The response directly addresses the user's query." }
+        },
+        {
+          "rubric_id": "helpfulness",
+          "rubric_content": { "text_property": "The response is helpful and provides useful information." }
+        },
+        {
+          "rubric_id": "grounding",
+          "rubric_content": { "text_property": "The response does not invent connected agents, successful delegations, or operational facts that are absent from tool output." }
+        }
+      ]
+    }
+  }
+}

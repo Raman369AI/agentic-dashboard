@@ -1,0 +1,43 @@
+{
+  "eval_set_id": "agentic_dashboard_core",
+  "name": "Agentic Dashboard Core Behavior",
+  "description": "Checks concise onboarding and grounded operational reporting.",
+  "eval_cases": [
+    {
+      "eval_id": "workspace_onboarding",
+      "conversation": [
+        {
+          "invocation_id": "onboarding_1",
+          "user_content": {
+            "parts": [{"text": "Hello. Briefly tell me what this workspace can do."}]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [{"text": "I can help through chat, create interactive dashboards, inspect workspace status, and coordinate registered A2A agents."}]
+          },
+          "intermediate_data": {"tool_uses": []}
+        }
+      ],
+      "session_input": {"app_name": "app", "user_id": "eval_user", "state": {}}
+    },
+    {
+      "eval_id": "grounded_workspace_status",
+      "conversation": [
+        {
+          "invocation_id": "status_1",
+          "user_content": {
+            "parts": [{"text": "Give me a concise operational snapshot of this workspace."}]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [{"text": "The workspace is ready. Protocol health is 100%, there are no active runs, and the connected-agent count comes from the workspace snapshot."}]
+          },
+          "intermediate_data": {
+            "tool_uses": [{"name": "workspace_snapshot", "args": {}}]
+          }
+        }
+      ],
+      "session_input": {"app_name": "app", "user_id": "eval_user", "state": {}}
+    }
+  ]
+}
