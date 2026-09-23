@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import type { A2UISurface } from '../types'
+import { safeUrl } from '../protocol'
 
 function atPath(data: Record<string, unknown>, path?: string): unknown {
-  if (!path) return undefined
+  if (!path || path.split('/').some((key) => ['__proto__', 'constructor', 'prototype'].includes(key))) return undefined
   return path.split('/').filter(Boolean).reduce<unknown>((value, key) => value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined, data)
 }
 
 function setAtPath(data: Record<string, unknown>, path: string, value: unknown) {
+  if (path.split('/').some((key) => ['__proto__', 'constructor', 'prototype'].includes(key))) return data
   const copy = structuredClone(data)
   const keys = path.split('/').filter(Boolean)
   let cursor = copy
@@ -43,10 +45,11 @@ export function A2UIRenderer({ surface, onAction }: { surface: A2UISurface; onAc
     if (path) setData((current) => setAtPath(current, path, next))
   }
 
-  const render = (id: string): React.ReactNode => {
+  const render = (id: string, ancestors: string[] = []): React.ReactNode => {
+    if (ancestors.includes(id) || ancestors.length > 40) return <p key={id}>Invalid cyclic or deeply nested component: {id}</p>
     const node = byId.get(id)
     if (!node) return <div className="unknown-widget">Missing component: {id}</div>
-    const children = (node.children || (node.child ? [node.child] : [])).map(render)
+    const children = (Array.isArray(node.children) ? node.children : node.child ? [node.child] : []).map((child) => render(child, [...ancestors, id]))
     const key = `${surface.surfaceId}-${node.id}`
     switch (node.component.toLowerCase()) {
       case 'column': return <div className="a2-column" key={key}>{children}</div>
@@ -69,9 +72,9 @@ export function A2UIRenderer({ surface, onAction }: { surface: A2UISurface; onAc
       case 'divider': return <hr key={key} />
       case 'metric': return <article className="metric-card" key={key}><span>{String(node.label || '')}</span><strong>{resolved(node.value, data)}</strong><small>{String(node.trend || '')}</small></article>
       case 'progress': return <div className="a2-progress" key={key}><span>{String(node.label || '')}</span><div><i style={{ width: `${Math.min(100, Number(node.value || 0))}%` }} /></div></div>
-      case 'image': return <figure className="a2-image" key={key}><img src={resolved(node.url || node.src, data)} alt={String(node.alt || '')} /><figcaption>{String(node.caption || '')}</figcaption></figure>
-      case 'audio': return <audio key={key} src={resolved(node.url || node.src, data)} controls />
-      case 'video': return <video className="a2-video" key={key} src={resolved(node.url || node.src, data)} controls />
+      case 'image': return <figure className="a2-image" key={key}><img src={safeUrl(resolved(node.url || node.src, data))} alt={String(node.alt || '')} /><figcaption>{String(node.caption || '')}</figcaption></figure>
+      case 'audio': return <audio key={key} src={safeUrl(resolved(node.url || node.src, data))} controls />
+      case 'video': return <video className="a2-video" key={key} src={safeUrl(resolved(node.url || node.src, data))} controls />
       case 'code': return <pre className="a2-code" key={key}><code>{resolved(node.code || node.text, data)}</code></pre>
       case 'badge': return <span className="a2-badge" key={key}>{resolved(node.text || node.label, data)}</span>
       case 'list': return <ul className="a2-list" key={key}>{(Array.isArray(node.items) ? node.items : []).map((item, index) => <li key={index}>{typeof item === 'object' ? JSON.stringify(item) : String(item)}</li>)}</ul>
@@ -79,7 +82,7 @@ export function A2UIRenderer({ surface, onAction }: { surface: A2UISurface; onAc
         const tabs = Array.isArray(node.children) ? node.children : []
         const active = activeTabs[node.id] || 0
         const labels = Array.isArray(node.labels) ? node.labels.map(String) : tabs.map((_, index) => `Tab ${index + 1}`)
-        return <div className="a2-tabs" key={key}><div>{labels.map((label, index) => <button className={active === index ? 'active' : ''} onClick={() => setActiveTabs((state) => ({ ...state, [node.id]: index }))} key={label}>{label}</button>)}</div>{tabs[active] ? render(tabs[active]) : null}</div>
+        return <div className="a2-tabs" key={key}><div>{labels.map((label, index) => <button className={active === index ? 'active' : ''} onClick={() => setActiveTabs((state) => ({ ...state, [node.id]: index }))} key={label}>{label}</button>)}</div>{tabs[active] ? render(tabs[active], [...ancestors, id]) : null}</div>
       }
       case 'table': {
         const rows = Array.isArray(node.rows) ? node.rows as Record<string, unknown>[] : []
@@ -94,23 +97,4 @@ export function A2UIRenderer({ surface, onAction }: { surface: A2UISurface; onAc
   return <div className="a2-surface">{root ? render(root) : <p>Empty surface</p>}</div>
 }
 
-export const demoSurface: A2UISurface = {
-  surfaceId: 'workspace-overview',
-  components: [
-    { id: 'root', component: 'Column', children: ['metrics', 'run-card', 'agents-card'] },
-    { id: 'metrics', component: 'Row', children: ['m1', 'm2', 'm3'] },
-    { id: 'm1', component: 'Metric', label: 'Active agents', value: '01', trend: 'Coordinator online' },
-    { id: 'm2', component: 'Metric', label: 'Protocols', value: '03', trend: 'AG-UI · A2UI · A2A' },
-    { id: 'm3', component: 'Metric', label: 'Health', value: '100%', trend: 'Ready' },
-    { id: 'run-card', component: 'Card', children: ['run-title', 'run-copy', 'progress'] },
-    { id: 'run-title', component: 'Text', variant: 'title', text: 'Live orchestration' },
-    { id: 'run-copy', component: 'Text', text: 'The coordinator is ready to route work across connected specialists.' },
-    { id: 'progress', component: 'Progress', label: 'Workspace readiness', value: 100 },
-    { id: 'agents-card', component: 'Card', children: ['agents-title', 'agents-table'] },
-    { id: 'agents-title', component: 'Text', variant: 'title', text: 'Agent network' },
-    { id: 'agents-table', component: 'Table', columns: ['Agent', 'Protocol', 'Status'], rows: [
-      { Agent: 'Workspace coordinator', Protocol: 'ADK · AG-UI', Status: 'Online' },
-      { Agent: 'Connect any specialist', Protocol: 'A2A', Status: 'Ready' },
-    ] },
-  ],
-}
+export const emptySurface: A2UISurface = { surfaceId: 'query-results', components: [] }

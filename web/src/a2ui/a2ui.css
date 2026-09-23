@@ -1,0 +1,35 @@
+.a2v1-surface { font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; color: inherit; min-width: 0; }
+.a2v1-node { min-width: 0; }
+.a2v1-node:not(.a2v1-Column):not(.a2v1-Row):not(.a2v1-List) { margin: 8px; }
+.a2v1-surface p { margin: 0 0 6px; }
+.a2v1-surface input, .a2v1-surface textarea, .a2v1-surface button, .a2v1-surface select { font: inherit; color: inherit; }
+.a2v1-surface input:not([type=checkbox]):not([type=radio]):not([type=range]), .a2v1-surface textarea { display: block; width: 100%; padding: 9px; border: 1px solid #646775; border-radius: 6px; background: transparent; }
+.a2v1-surface input[type=checkbox], .a2v1-surface input[type=radio] { margin-right: 8px; }
+.a2v1-surface label { display: block; }
+.a2v1-surface fieldset { border: 1px solid #646775; border-radius: 8px; }
+.a2v1-surface button { padding: 8px 12px; border: 1px solid #646775; border-radius: 6px; background: transparent; cursor: pointer; }
+.a2v1-surface button:disabled { opacity: .45; cursor: not-allowed; }
+.a2v1-surface button:focus-visible, .a2v1-surface input:focus-visible, .a2v1-surface textarea:focus-visible { outline: 2px solid #a99bff; outline-offset: 2px; }
+.a2v1-button.primary, .a2v1-surface button[aria-selected=true], .a2v1-surface button[aria-pressed=true] { background: #6554bd; color: white; }
+.a2v1-button.borderless { border: none; background: transparent; }
+.a2v1-card { padding: 14px; border: 1px solid #646775; border-radius: 10px; background: transparent; }
+.a2v1-text.caption { font-size: .8em; opacity: .8; }
+.a2v1-list { overflow: auto; max-height: 480px; }
+.a2v1-list > .a2v1-node { flex-shrink: 0; max-width: 100%; }
+.a2v1-image { max-width: 100%; }
+.a2v1-image.icon { width: 24px; height: 24px; }
+.a2v1-image.avatar { width: 40px; height: 40px; border-radius: 50%; }
+.a2v1-image.smallFeature { width: 100px; height: 100px; }
+.a2v1-image.mediumFeature { width: 100%; max-width: 300px; }
+.a2v1-image.largeFeature { width: 100%; max-height: 400px; }
+.a2v1-image.header { width: 100%; height: 200px; object-fit: cover; }
+.a2v1-surface video, .a2v1-surface audio { width: 100%; max-height: 400px; }
+.a2v1-divider.horizontal { border-top: 1px solid #646775; width: 100%; }
+.a2v1-divider.vertical { border-left: 1px solid #646775; min-height: 24px; height: 100%; }
+.a2v1-surface dialog { position: fixed; inset: 0; width: min(90vw, 640px); max-height: 85vh; padding: 24px; color: inherit; background: #171921; border: 1px solid #646775; border-radius: 12px; overflow: auto; }
+.a2v1-surface dialog::backdrop { background: #000a; }
+.a2v1-close { float: right; }
+.a2v1-choice.chips button { margin: 4px; }
+.a2v1-error { color: #f6a4a4; font-size: 12px; }
+.a2v1-placeholder { opacity: .65; }
+.a2v1-sr { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }

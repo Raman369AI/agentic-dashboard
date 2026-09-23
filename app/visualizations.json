@@ -1,0 +1,97 @@
+{
+  "contractVersion": "1.0",
+  "formats": [
+    {
+      "kind": "vega-lite",
+      "engineVersion": "6.4.3",
+      "description": "Inline Vega-Lite specification; interpreted in a worker.",
+      "required": [
+        "kind",
+        "spec"
+      ],
+      "example": {
+        "kind": "vega-lite",
+        "title": "Revenue",
+        "spec": {
+          "data": {
+            "values": [
+              {
+                "region": "West",
+                "value": 42
+              }
+            ]
+          },
+          "mark": "bar",
+          "encoding": {
+            "x": {
+              "field": "region",
+              "type": "nominal"
+            },
+            "y": {
+              "field": "value",
+              "type": "quantitative"
+            }
+          }
+        }
+      }
+    },
+    {
+      "kind": "vega",
+      "engineVersion": "6.4.0",
+      "description": "Inline Vega specification for lower-level marks, layouts and data transforms.",
+      "required": [
+        "kind",
+        "spec"
+      ]
+    },
+    {
+      "kind": "svg",
+      "description": "Passive SVG geometry, text, groups, gradients, masks and clipping. No scripts, HTML, stylesheets, images or external references.",
+      "required": [
+        "kind",
+        "svg"
+      ],
+      "example": {
+        "kind": "svg",
+        "title": "Custom visual",
+        "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 50\"><rect x=\"2\" y=\"2\" width=\"96\" height=\"46\" rx=\"8\" fill=\"#7770ee\"/></svg>"
+      }
+    },
+    {
+      "kind": "dashboard",
+      "description": "Compose visual and existing result blocks; children are normalized by the same result pipeline.",
+      "required": [
+        "kind",
+        "children"
+      ],
+      "maxChildren": 24,
+      "columns": {
+        "minimum": 1,
+        "maximum": 6
+      }
+    }
+  ],
+  "domainPresentation": {
+    "field": "presentation",
+    "description": "A domain-specific result may carry a visual block in presentation; original domain data remains available in Visualization source."
+  },
+  "chartInteractions": {
+    "bindings": [
+      "range",
+      "select",
+      "checkbox"
+    ],
+    "scope": "Local bound value parameters/signals only. Use A2UI for business actions. No pointer brushing or DOM event handlers.",
+    "maxControls": 20
+  },
+  "security": {
+    "externalResources": false,
+    "agentJavaScript": false,
+    "agentHTML": false,
+    "expressionEvaluation": "Vega AST interpreter 2.3.2",
+    "workerTimeoutMs": 8000,
+    "maxConcurrentWorkers": 2,
+    "maxSpecBytes": 2097152,
+    "maxSvgNodes": 10000
+  }
+}

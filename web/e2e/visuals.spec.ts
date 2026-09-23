@@ -1,0 +1,37 @@
+import { expect, test } from '@playwright/test'
+
+test('renders service-defined charts, interactive parameters and bespoke graphics without plugins', async ({ page }) => {
+  const errors: string[] = []
+  const external: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  page.on('request', (request) => { if (request.url().includes('example.invalid')) external.push(request.url()) })
+  await page.goto('/')
+  await page.getByRole('button', { name: /^Connections/ }).click()
+  const drawer = page.getByRole('dialog', { name: 'Connections' })
+  await drawer.getByLabel('Connection type').selectOption('http')
+  await drawer.getByLabel('Name', { exact: true }).fill('Visual service')
+  await drawer.getByLabel('Endpoint URL', { exact: true }).fill('http://127.0.0.1:9101/visuals')
+  await drawer.getByRole('button', { name: 'Add connection' }).click()
+  await drawer.locator('article').filter({ hasText: 'Visual service' }).getByRole('button', { name: 'Use', exact: true }).click()
+  await page.getByPlaceholder('Message Visual service…').fill('Show custom visuals')
+  await page.getByRole('button', { name: 'Send', exact: true }).click()
+  const canvas = page.locator('.canvas-panel')
+  const chart = canvas.getByRole('img', { name: 'Revenue trend', exact: true })
+  await expect(canvas.locator('.visual-result [role="alert"]')).toHaveCount(0)
+  await expect(chart).toBeVisible({ timeout: 15000 })
+  await expect(canvas.getByRole('img', { name: 'Custom service topology', exact: true })).toBeVisible()
+  expect(await chart.evaluate((element: HTMLImageElement) => element.complete && element.naturalWidth > 0)).toBeTruthy()
+  const before = await chart.getAttribute('src')
+  await canvas.getByRole('slider', { name: 'Minimum revenue', exact: true }).fill('80')
+  await expect(chart).toBeVisible()
+  await expect(chart).not.toHaveAttribute('src', before!)
+  await expect(canvas.getByText('Connected systems', { exact: true })).toBeVisible()
+  await page.screenshot({ path: test.info().outputPath('bespoke-visuals.png'), fullPage: true })
+
+  await page.getByPlaceholder('Message Visual service…').fill('unsafe')
+  await page.getByRole('button', { name: 'Send', exact: true }).click()
+  await expect(canvas.getByRole('alert').filter({ hasText: 'Unsupported SVG element: script' })).toBeVisible()
+  await expect(canvas.getByRole('alert').filter({ hasText: 'external visualization field' })).toBeVisible()
+  expect(external).toEqual([])
+  expect(errors).toEqual([])
+})

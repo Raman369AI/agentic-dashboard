@@ -14,7 +14,8 @@ import httpx
 from a2a.client.card_resolver import A2ACardResolver
 from a2a.client.client import ClientConfig
 from a2a.client.client_factory import ClientFactory
-from a2a.types import Message, Part, Role, TextPart
+from a2a.types import Message, Part, Role, SendMessageRequest
+from google.protobuf.json_format import MessageToDict
 
 
 class RegistryError(ValueError):
@@ -156,46 +157,52 @@ async def validate_remote_url(url: str, allow_private: bool) -> str:
             raise RegistryError(
                 "Private-network agents are disabled. Set ALLOW_PRIVATE_AGENTS=true for local development."
             )
-    return f"{parsed.scheme}://{parsed.netloc}{parsed.path}".rstrip("/")
+    return url.rstrip("/")
 
 
-async def discover_agent(base_url: str, timeout: float) -> dict:
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
-        card = await A2ACardResolver(client, base_url).get_agent_card()
-    return card.model_dump(mode="json", by_alias=True, exclude_none=True)
+async def discover_agent(base_url: str, timeout: float, allow_private: bool) -> dict:
+    async def guard(request: httpx.Request) -> None:
+        await validate_remote_url(str(request.url), allow_private)
 
-
-async def invoke_agent(record: AgentRecord, prompt: str, timeout: float) -> list[dict]:
     async with httpx.AsyncClient(
-        timeout=timeout, follow_redirects=False
+        timeout=timeout,
+        follow_redirects=False,
+        event_hooks={"request": [guard]},
+    ) as client:
+        card = await A2ACardResolver(client, base_url).get_agent_card()
+    return MessageToDict(card)
+
+
+async def invoke_agent(
+    record: AgentRecord, prompt: str, timeout: float, allow_private: bool
+) -> list[dict]:
+    async def guard(request: httpx.Request) -> None:
+        await validate_remote_url(str(request.url), allow_private)
+
+    async with httpx.AsyncClient(
+        timeout=timeout,
+        follow_redirects=False,
+        event_hooks={"request": [guard]},
     ) as http_client:
-        client = await ClientFactory.connect(
-            record.base_url,
-            client_config=ClientConfig(httpx_client=http_client, streaming=True),
-        )
+        card = await A2ACardResolver(http_client, record.base_url).get_agent_card()
+        client = ClientFactory(
+            ClientConfig(httpx_client=http_client, streaming=True)
+        ).create(card)
         message = Message(
-            role=Role.user,
+            role=Role.ROLE_USER,
             message_id=str(uuid.uuid4()),
-            parts=[Part(root=TextPart(text=prompt))],
+            parts=[Part(text=prompt)],
         )
         events: list[dict] = []
-        async for event in client.send_message(message):
+        async for event in client.send_message(SendMessageRequest(message=message)):
             if isinstance(event, tuple):
                 task, update = event
                 events.append(
                     {
-                        "task": task.model_dump(
-                            mode="json", by_alias=True, exclude_none=True
-                        ),
-                        "update": update.model_dump(
-                            mode="json", by_alias=True, exclude_none=True
-                        )
-                        if update
-                        else None,
+                        "task": MessageToDict(task),
+                        "update": MessageToDict(update) if update else None,
                     }
                 )
             else:
-                events.append(
-                    event.model_dump(mode="json", by_alias=True, exclude_none=True)
-                )
+                events.append(MessageToDict(event))
         return events

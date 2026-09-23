@@ -5,25 +5,25 @@
 
 # Install dependencies using uv package manager
 install:
-	@command -v uv >/dev/null 2>&1 || { echo "uv is not installed. Installing uv..."; curl -LsSf https://astral.sh/uv/0.8.13/install.sh | sh; source $HOME/.local/bin/env; }
-	uv sync
-	npm --prefix web install
+	@command -v uv >/dev/null 2>&1 || { echo "Install uv: https://docs.astral.sh/uv/getting-started/installation/"; exit 1; }
+	uv sync --locked
+	npm --prefix web ci
 
 # Launch the standalone dashboard and ADK API. Ctrl-C stops both processes.
 dev:
 	@trap 'kill 0' INT TERM EXIT; \
-		uv run uvicorn app.server:app --host 0.0.0.0 --port 8000 --reload & \
+		uv run uvicorn app.server:app --host 127.0.0.1 --port 8000 --reload & \
 		npm --prefix web run dev & \
 		wait
 
 api:
-	uv run uvicorn app.server:app --host 0.0.0.0 --port 8000 --reload
+	uv run uvicorn app.server:app --host 127.0.0.1 --port 8000 --reload
 
 web:
 	npm --prefix web run dev
 
 a2a:
-	uv run uvicorn app.a2a_server:app --host 0.0.0.0 --port 8001 --reload
+	uv run uvicorn app.a2a_server:app --host 127.0.0.1 --port 8001 --reload
 
 # ==============================================================================
 # Playground Targets

@@ -9,16 +9,30 @@
         {
           "invocation_id": "onboarding_1",
           "user_content": {
-            "parts": [{"text": "Hello. Briefly tell me what this workspace can do."}]
+            "parts": [
+              {
+                "text": "Hello. Briefly tell me what this workspace can do."
+              }
+            ]
           },
           "final_response": {
             "role": "model",
-            "parts": [{"text": "I can help through chat, create interactive dashboards, inspect workspace status, and coordinate registered A2A agents."}]
+            "parts": [
+              {
+                "text": "I can help through chat, create interactive dashboards, inspect workspace status, and coordinate registered A2A agents."
+              }
+            ]
           },
-          "intermediate_data": {"tool_uses": []}
+          "intermediate_data": {
+            "tool_uses": []
+          }
         }
       ],
-      "session_input": {"app_name": "app", "user_id": "eval_user", "state": {}}
+      "session_input": {
+        "app_name": "app",
+        "user_id": "eval_user",
+        "state": {}
+      }
     },
     {
       "eval_id": "grounded_workspace_status",
@@ -26,18 +40,71 @@
         {
           "invocation_id": "status_1",
           "user_content": {
-            "parts": [{"text": "Give me a concise operational snapshot of this workspace."}]
+            "parts": [
+              {
+                "text": "Give me a concise operational snapshot of this workspace."
+              }
+            ]
           },
           "final_response": {
             "role": "model",
-            "parts": [{"text": "The workspace is ready. Protocol health is 100%, there are no active runs, and the connected-agent count comes from the workspace snapshot."}]
+            "parts": [
+              {
+                "text": "The snapshot reports configured connections. Live service health has not been probed."
+              }
+            ]
           },
           "intermediate_data": {
-            "tool_uses": [{"name": "workspace_snapshot", "args": {}}]
+            "tool_uses": [
+              {
+                "name": "workspace_snapshot",
+                "args": {}
+              }
+            ]
           }
         }
       ],
-      "session_input": {"app_name": "app", "user_id": "eval_user", "state": {}}
+      "session_input": {
+        "app_name": "app",
+        "user_id": "eval_user",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "connection_discovery",
+      "conversation": [
+        {
+          "invocation_id": "discover_1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "List the configured HTTP and MCP services and their available tools. Do not run any service queries."
+              }
+            ]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "There are currently no configured connections."
+              }
+            ]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "list_connections",
+                "args": {}
+              }
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "eval_user",
+        "state": {}
+      }
     }
   ]
 }

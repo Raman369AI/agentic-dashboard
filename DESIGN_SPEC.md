@@ -1,70 +1,60 @@
 # Agentic Dashboard — Design Specification
 
-## Overview
+## Declarative bespoke visuals
 
-Agentic Dashboard is a standalone, protocol-first workspace for interacting
-with Google ADK agents. It combines a first-class chat experience with a
-universal dashboard canvas for agent-generated forms, metrics, tables, charts,
-approvals, artifacts, and operational status.
+Render new visual designs without installing a client component: bundled Vega/Vega-Lite, restricted SVG, and composable dashboard blocks. Run chart computation in cancellable workers with interpreted expressions, inline data only and no remote loading. Preserve errors and original specifications. Expose explicit bound-signal controls; use A2UI for agent-side business actions. Never execute agent-supplied JavaScript or HTML.
 
-The Python control plane is built on Google ADK and exposed to the browser over
-AG-UI. Remote agents are discovered and invoked through A2A Agent Cards. Rich
-agent output uses A2UI v0.9 messages and a strict client-side component catalog;
-plain text remains a complete fallback.
+## Universal extension architecture
 
-## Example Use Cases
+Add a versioned, trusted server adapter registry exposed through discovery to the standalone client. New adapter kinds must not require frontend code changes. Add OpenAPI operation discovery and schema-driven inputs with explicit unsupported-operation diagnostics, guarded network access, and no automatic execution during discovery. Preserve opaque results as inspectable data and route operations explicitly; never infer permission for business side effects.
 
-1. Chat with the built-in coordinator and inspect streamed tool activity.
-2. Ask the coordinator to turn an analysis into an interactive dashboard.
-3. Register a remote A2A agent by URL without changing application code.
-4. Delegate work to a registered agent and display its text, data, or artifacts.
-5. Keep chat beside a generated dashboard while switching conversations.
+## Revised scope (2026-09-18)
 
-## Tools Required
+Relay is a standalone, framework-independent client for chat, dashboards, and data results. A FastAPI gateway handles runtime connections; Google ADK supplies an optional coordinator. An external agent or semantic service does not need to adopt ADK or A2UI.
 
-- Google ADK with Gemini 3 Flash Preview for orchestration.
-- `ag-ui-adk` for the AG-UI event stream and state synchronization.
-- `a2a-sdk` for Agent Card discovery and remote task invocation.
-- A2UI/AG-UI toolkit support for validated declarative UI generation.
-- FastAPI for health, registry, and protocol endpoints.
-- React and Vite for a fully standalone browser client.
-- SQLite for the local agent registry.
+The earlier A2A-only registry did not satisfy the plug-in requirement. The revised boundary is explicit protocol compatibility, not an unqualified promise to invoke every API.
 
-Authentication supports either `GOOGLE_API_KEY` with AI Studio or Application
-Default Credentials with Vertex AI. Remote-agent authentication can be added as
-an interceptor without changing the registry contract.
+## Architecture
 
-## Constraints and Safety Rules
+- React/Vite client: conversation, result canvas/dashboard, run activity, media/artifacts, and connection management.
+- Connection manifests: name, protocol kind, endpoint, optional credential reference, and optional HTTP mapping/input schema.
+- Gateway adapters: A2A JSON-RPC/HTTP+JSON, AG-UI SSE, MCP Streamable HTTP tools, HTTP GET/POST JSON/text.
+- Discovery: A2A Agent Cards and MCP tools/schemas. HTTP/AG-UI configuration is not reported as live health.
+- Runtime execution: common SSE lifecycle with native AG-UI events or normalized result events.
+- Rendering: text/Markdown, rows/tables, explicit metrics/bar charts, safe media links, local A2UI catalog, and JSON fallback.
+- Extension: declarative Vega/Vega-Lite, SVG and composed visual blocks need no application renderer registration; native host components can optionally register by kind. New transports require a tested backend adapter.
+- Persistence: SQLite connection configuration, one-time non-destructive import of legacy A2A registrations. Browser threads and ADK sessions remain in memory.
 
-- The client never executes agent-generated JavaScript or HTML.
-- Only components in the local A2UI catalog are rendered.
-- Agent Cards and URL schemes are validated before persistence.
-- Private, loopback, link-local, and metadata endpoints are blocked unless the
-  operator explicitly enables local-agent development.
-- Network operations use bounded timeouts and response sizes.
-- Unknown components and protocol events degrade to visible safe fallbacks.
-- Secrets are accepted only through environment variables.
-- Destructive frontend actions require an explicit future approval flow.
+## User workflows
 
-## Success Criteria
+1. Register a remote service using a form or JSON manifest.
+2. Discover MCP tool inputs or supply an HTTP schema and request mapping.
+3. Select the service and send a prompt or structured query without coordinator credentials.
+4. Display streamed text and heterogeneous results in the same workspace.
+5. Optionally let the ADK coordinator discover and query registered services.
+6. Run the UI separately, behind a same-origin proxy, or mount API/static assets in an existing FastAPI application.
 
-- `make dev` launches the backend and standalone client.
-- Chat streams standard AG-UI lifecycle, text, state, and tool-call events.
-- A2UI output renders as trusted native React components.
-- A remote A2A agent can be registered, inspected, invoked, and removed.
-- The interface remains useful without a model key through its demo workspace.
-- Backend tests, frontend tests, linting, and production builds pass.
+## Safety and explicit limits
 
-## Edge Cases
+No agent-generated JavaScript/HTML execution, dynamic dependency installation, or downloaded A2UI catalogs. Unknown and malformed render payloads remain inspectable. Credential values are server-side environment variables, never browser configuration or persisted auth values. Outgoing URLs are checked and private addresses disabled by default; egress policy is still required for production.
 
-- Invalid, duplicate, unreachable, or private Agent Card URLs.
-- Remote agents that disconnect or return only partial tasks.
-- Malformed A2UI operations or unsupported components.
-- Browser refresh, empty threads, cancelled requests, and API unavailability.
-- Missing Gemini credentials and model/provider errors.
+This is a single-operator prototype, not an authenticated multi-tenant service. Remote tools may perform writes: there is no universal approval or rollback protocol. Cancellation closes local requests but cannot guarantee remote task rollback. Response/time limits are documented; SDK buffering is not a comprehensive memory sandbox.
 
-## Initial Delivery
+Executable visualization plugins, OAuth flows, MCP stdio/resources/prompts, arbitrary undocumented API inference, polling workflows, and persistence of conversations are outside this delivery. Detailed constraints live in docs/connections.md.
 
-The first delivery is a local, prototype-first Git repository. It deliberately
-contains no cloud deployment or CI/CD mutation; those can be added with the
-Agent Starter Pack after choosing a deployment target.
+## Acceptance criteria
+
+- Current compatible dependency versions and committed lockfiles, with any non-latest choice explained.
+- A standalone client that can target a separately hosted API.
+- Real browser registration/invocation tests for HTTP, MCP, AG-UI, and ADK/A2A, without a model key.
+- HTTP typed mapping/JSON pointers, nested GET query serialization, MCP discovery/schema validation, auth-reference safety, URL policy, and legacy migration covered by backend tests.
+- Incremental A2UI updates, typed/unknown output, SSE framing, safe URLs, and renderer failures covered by client tests.
+- Backend tests, client tests, lint/type checks, production builds, and browser contract test pass.
+- ADK coordinator evaluations preserve the configured Gemini model, test discovered services and grounded status, and report results separately from deterministic protocol tests.
+- README and integration guide distinguish tested capabilities from integration examples and production gaps.
+
+No cloud deployment is authorized by this specification.
+
+## A2UI v1 correction
+
+Implement the pinned v1.0 candidate wire schemas, all 18 Basic Catalog components and 14 catalog functions plus @index, atomic ordered updates, JSON pointers, scoped templates, validation, accessibility, mixed catalogs, capability/data-model metadata, structured actions, bidirectional RPC, caller boundaries, errors and lifecycle cleanup. Test upstream schema fixtures separately from runtime/DOM/transport behavior. Do not claim full conformance from schema tests alone. Audit other advertised protocols and document exact omissions. Preserve the existing configured Gemini model.

@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from ag_ui_adk import ADKAgent, add_adk_fastapi_endpoint
+from ag_ui_adk import add_adk_fastapi_endpoint
 from fastapi import FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from app.a2ui_adk import A2UIADKAgent
 from app.agent import root_agent
 from app.config import get_settings
+from app.connection_routes import router as connection_router
 from app.domain.registry import (
     AgentRegistry,
     RegistryError,
@@ -32,6 +34,7 @@ api = FastAPI(
     description="Google ADK control plane with AG-UI, A2UI, and A2A.",
     lifespan=lifespan,
 )
+api.include_router(connection_router)
 api.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
@@ -54,7 +57,15 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": settings.app_name,
-        "protocols": {"agUi": "0.1", "a2ui": "0.9", "a2a": "0.3"},
+        "protocols": {
+            "agUi": "1.0",
+            "a2ui": "v1.0 candidate (pinned)",
+            "a2a": "1.0 (0.3 compatibility)",
+            "mcp": "2.2 SDK",
+            "http": "JSON",
+            "openapi": "3.0 / 3.1 / 3.2 JSON subset",
+            "adapterContract": "1.0",
+        },
     }
 
 
@@ -67,11 +78,13 @@ async def list_agents() -> dict:
 async def register_agent(request: RegisterAgentRequest) -> dict:
     try:
         base_url = await validate_remote_url(request.url, settings.allow_private_agents)
-        card = await discover_agent(base_url, settings.agent_timeout_seconds)
+        card = await discover_agent(
+            base_url, settings.agent_timeout_seconds, settings.allow_private_agents
+        )
         await validate_remote_url(
             str(card.get("url", base_url)), settings.allow_private_agents
         )
-        for interface in card.get("additionalInterfaces", []):
+        for interface in card.get("supportedInterfaces", []):
             if isinstance(interface, dict) and interface.get("url"):
                 await validate_remote_url(
                     str(interface["url"]), settings.allow_private_agents
@@ -100,7 +113,10 @@ async def invoke_registered_agent(agent_id: str, request: InvokeAgentRequest) ->
     try:
         return {
             "events": await invoke_agent(
-                record, request.prompt, settings.agent_timeout_seconds
+                record,
+                request.prompt,
+                settings.agent_timeout_seconds,
+                settings.allow_private_agents,
             )
         }
     except Exception as error:
@@ -109,7 +125,7 @@ async def invoke_registered_agent(agent_id: str, request: InvokeAgentRequest) ->
         ) from error
 
 
-agui_agent = ADKAgent(
+agui_agent = A2UIADKAgent(
     adk_agent=root_agent,
     app_name=settings.app_name,
     user_id="dashboard-user",
@@ -118,16 +134,13 @@ agui_agent = ADKAgent(
     capabilities={
         "streaming": True,
         "state": True,
-        "custom": {"a2ui": "0.9", "a2aRegistry": True, "artifacts": True},
+        "custom": {
+            "a2ui": "v1.0 candidate (pinned)",
+            "a2aRegistry": True,
+            "artifacts": True,
+        },
     },
-    a2ui={
-        "inject_a2ui_tool": True,
-        "default_catalog_id": "https://agentic-dashboard.local/catalog/v0.9",
-        "guidelines": (
-            "Create dense, useful workspace dashboards. Prefer Card, Column, Row, "
-            "Text, Button, TextField and Divider. Keep labels short."
-        ),
-    },
+    a2ui={"inject_a2ui_tool": False},
 )
 add_adk_fastapi_endpoint(api, agui_agent, path="/api/ag-ui")
 

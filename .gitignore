@@ -227,3 +227,7 @@ service_account*.json
 google-credentials*.json
 application_default_credentials.json
 adc.json
+
+# Browser test output
+web/test-results/
+web/playwright-report/

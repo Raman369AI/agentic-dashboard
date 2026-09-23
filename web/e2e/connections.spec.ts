@@ -1,0 +1,55 @@
+import { expect, test } from '@playwright/test'
+
+test('connects HTTP, MCP, AG-UI, and A2A services through the UI without model credentials', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.goto('/')
+  async function connect(kind: string, name: string, url: string) {
+    await page.getByRole('button', { name: /^Connections/ }).click()
+    const drawer = page.getByRole('dialog', { name: 'Connections' })
+    await drawer.getByLabel('Connection type').selectOption(kind)
+    await drawer.getByLabel('Name', { exact: true }).fill(name)
+    await drawer.getByLabel(kind === 'a2a' ? 'Agent base URL' : 'Endpoint URL', { exact: true }).fill(url)
+    return drawer
+  }
+  let drawer = await connect('http', 'Sales HTTP', 'http://127.0.0.1:9101/query')
+  await drawer.getByLabel('Request mapping (JSON)').fill('{"query":"$input"}')
+  await drawer.getByLabel('Response JSON pointer').fill('/answer')
+  await drawer.getByRole('button', { name: 'Add connection' }).click()
+  await drawer.locator('article').filter({ hasText: 'Sales HTTP' }).getByRole('button', { name: 'Use', exact: true }).click()
+  await page.getByLabel('Query input (JSON)').fill('{"region":"West"}')
+  await page.getByRole('button', { name: 'Send', exact: true }).click()
+  await expect(page.locator('.canvas-panel').getByText('Quarterly revenue', { exact: true })).toBeVisible()
+  await expect(page.locator('.canvas-panel').getByRole('cell', { name: '180', exact: true })).toBeVisible()
+
+  drawer = await connect('mcp', 'Semantic MCP', 'http://127.0.0.1:9101/mcp')
+  await drawer.getByRole('button', { name: 'Add connection' }).click()
+  await drawer.locator('article').filter({ hasText: 'Semantic MCP' }).getByRole('button', { name: 'Use', exact: true }).click()
+  await expect(page.getByRole('combobox', { name: 'Tool', exact: true })).toHaveValue('revenue')
+  await page.getByLabel(/^region \*/i).fill('North')
+  await page.getByRole('button', { name: 'Send', exact: true }).click()
+  await expect(page.locator('.canvas-panel').getByText('Revenue for', { exact: false }).first()).toContainText('North')
+
+  drawer = await connect('agui', 'Streaming agent', 'http://127.0.0.1:9101/ag-ui')
+  await drawer.getByRole('button', { name: 'Add connection' }).click()
+  await drawer.locator('article').filter({ hasText: 'Streaming agent' }).getByRole('button', { name: 'Use', exact: true }).click()
+  await page.getByPlaceholder('Message Streaming agent…').fill('Hello')
+  await page.getByRole('button', { name: 'Send', exact: true }).click()
+  await expect(page.locator('.messages').getByText('AG-UI fixture connected.')).toBeVisible()
+  await expect(page.locator('.canvas-panel').getByText('Active accounts')).toBeVisible()
+
+  drawer = await connect('a2a', 'A2A fixture', 'http://127.0.0.1:9102')
+  await drawer.getByRole('button', { name: 'Add connection' }).click()
+  await drawer.locator('article').filter({ hasText: 'A2A fixture' }).getByRole('button', { name: 'Use', exact: true }).click()
+  await page.getByPlaceholder('Message A2A fixture…').fill('hello protocol')
+  await page.getByRole('button', { name: 'Send', exact: true }).click()
+  await expect(page.locator('.messages').getByText('A2A fixture received: hello protocol', { exact: false }).first()).toBeVisible()
+  await page.getByRole('button', { name: /^Connections/ }).click()
+  drawer = page.getByRole('dialog', { name: 'Connections' })
+  await drawer.getByRole('button', { name: 'Refresh A2A fixture', exact: true }).click()
+  await expect(drawer.getByRole('button', { name: 'Remove A2A fixture', exact: true })).toBeEnabled()
+  await drawer.getByRole('button', { name: 'Remove A2A fixture', exact: true }).click()
+  await expect(drawer.locator('article').filter({ hasText: 'A2A fixture' })).toHaveCount(0)
+  await page.screenshot({ path: test.info().outputPath('connections.png'), fullPage: true })
+  expect(errors).toEqual([])
+})

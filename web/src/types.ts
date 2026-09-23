@@ -38,7 +38,7 @@ export type A2UISurface = {
 export type Activity = {
   id: string
   name: string
-  status: 'running' | 'complete' | 'error'
+  status: 'running' | 'complete' | 'error' | 'cancelled'
   detail?: string
   startedAt?: string
   endedAt?: string
@@ -48,14 +48,20 @@ export type ProtocolEvent = Record<string, unknown> & { type?: string }
 
 
 export type ResultBlock = {
+  children?: ResultBlock[]
+  columns?: number
+  original?: unknown
   id: string
-  kind: 'text' | 'markdown' | 'json' | 'table' | 'image' | 'audio' | 'video' | 'file' | 'a2ui' | 'error' | 'status'
+  kind: string
   title?: string
   text?: string
   data?: unknown
   url?: string
   mimeType?: string
   name?: string
+  xKey?: string
+  yKey?: string
+  surfaceId?: string
   surface?: A2UISurface
   source?: string
 }
