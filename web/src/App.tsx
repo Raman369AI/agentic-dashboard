@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Activity, AppWindow, ArrowUp, Bot, Boxes, Check, ChevronDown, CircleStop, Command, Download, FileText, LayoutDashboard, Menu, MessageSquare, Moon, MoreHorizontal, Paperclip, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, Sparkles, Sun, Users, Workflow, X } from 'lucide-react'
+import { Activity, AppWindow, ArrowUp, Bot, Boxes, Check, ChevronDown, CircleStop, Command, Download, FileText, LayoutDashboard, Maximize2, Menu, MessageSquare, Minimize2, Moon, MoreHorizontal, Paperclip, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, Sun, Users, Workflow, X } from 'lucide-react'
 import { A2UIContext } from './a2ui/A2UIRenderer'
 import { streamAgent } from './api'
 import { getConnections, runConnection } from './connections-api'
@@ -42,6 +42,8 @@ function App() {
   const [search, setSearch] = useState('')
   const [modelOpen, setModelOpen] = useState(false)
   const [canvasMenu, setCanvasMenu] = useState(false)
+  const [canvasMode, setCanvasMode] = useState<'visual' | 'payload'>('visual')
+  const [mobilePanel, setMobilePanel] = useState<'chat' | 'canvas'>('chat')
   const [theme, setTheme] = useState<'dark' | 'light'>(() => localStorage.getItem('relay-theme') === 'light' ? 'light' : 'dark')
   const [threadId, setThreadId] = useState(() => crypto.randomUUID())
   const [selectedAgent, setSelectedAgent] = useState<ConnectionRecord | null>(null)
@@ -83,13 +85,14 @@ function App() {
     setThreadId(crypto.randomUUID()); setMessages([welcome]); setActivities([]); setEvents([])
     setResults([]); normalizer.a2ui.dispose(); setNormalizer(new ResultNormalizer()); agentState.current = {}; toolArgs.current.clear()
     setSurface(emptySurface); setConfirmed(false); setTool(''); setQueryInput('{}'); setSelectedAgent(null); setInput(''); setView('chat'); setRunning(false)
+    setCanvasFull(false); setCanvasMode('visual'); setMobilePanel('chat'); setMobileNav(false)
   }
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); newThread() }
       if ((event.metaKey || event.ctrlKey) && event.key === '/') { event.preventDefault(); setSearchOpen(true) }
-      if (event.key === 'Escape') { setSearchOpen(false); setModelOpen(false); setCanvasMenu(false) }
+      if (event.key === 'Escape') { setSearchOpen(false); setModelOpen(false); setCanvasMenu(false); setMobileNav(false); setCanvasFull(false) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -246,37 +249,80 @@ function App() {
   const handleSurfaceAction = (name: string, context: unknown, data: Record<string, unknown>) => void send(`UI action: ${name}\nContext: ${JSON.stringify(context || {})}\nForm data: ${JSON.stringify(data)}`)
 
   const searched = search.trim().toLowerCase()
+  const activeConnection = selectedAgent?.name || 'ADK coordinator'
+  const threadTitle = messages.find((message) => message.role === 'user')?.content || 'A new thread. A world of possibilities.'
+  const canvasTitle = results.find((result) => ['dashboard', 'a2ui', 'a2ui-v1'].includes(result.kind))?.title || 'Live canvas'
   const searchItems = searched ? [
     ...messages.filter((item) => item.content.toLowerCase().includes(searched)).map((item) => ({ label: item.content, action: () => { setView('chat'); setSearchOpen(false) } })),
     ...results.filter((item) => `${item.title || ''} ${item.name || ''} ${item.text || ''}`.toLowerCase().includes(searched)).map((item) => ({ label: item.title || item.name || item.kind, action: () => { if (item.surface) setSurface(item.surface); setView('dashboards'); setSearchOpen(false) } })),
   ] : []
 
   return <A2UIContext.Provider value={normalizer.a2ui}><div className={`app-shell ${theme} ${canvasFull ? 'canvas-full' : ''}`}>
-    <nav className={`sidebar ${mobileNav ? 'mobile-open' : ''}`}>
-      <div className="brand"><div className="brand-mark"><Command size={18} /></div><span>Relay</span><small>ADK</small></div>
-      <button className="new-thread" onClick={newThread}><Plus size={17} /> New thread <kbd>⌘ K</kbd></button>
-      <div className="nav-group"><span>Workspace</span>{nav.map((item) => <button className={view === item.id ? 'active' : ''} onClick={() => chooseView(item.id)} key={item.id}><item.icon size={18} /> {item.label}{item.id === 'runs' && activities.length > 0 && <b>{activities.length}</b>}</button>)}</div>
-      <div className="nav-group"><span>Manage</span><button onClick={() => setDrawerOpen(true)}><Users size={18} /> Connections{agentCount > 0 && <b>{agentCount}</b>}</button>{manage.map((item) => <button className={view === item.id ? 'active' : ''} onClick={() => chooseView(item.id)} key={item.id}><item.icon size={18} /> {item.label}</button>)}</div>
-
-      <div className="sidebar-bottom"><button className={view === 'settings' ? 'active' : ''} onClick={() => chooseView('settings')}><Settings2 size={18} /> Settings</button><button className="profile" onClick={() => chooseView('settings')}><div>RR</div><span><strong>Workspace</strong><small>{selectedAgent ? selectedAgent.name : 'ADK coordinator'}</small></span><ChevronDown size={15} /></button></div>
+    <nav className={`sidebar ${mobileNav ? 'mobile-open' : ''}`} aria-label="Workspace navigation">
+      <div className="brand"><div className="brand-mark"><Command size={18} /></div><span>Relay</span><small>NEON</small><button className="icon-button nav-close" aria-label="Close navigation" onClick={() => setMobileNav(false)}><X size={16} /></button></div>
+      <button className="new-thread" onClick={newThread} title="New thread"><Plus size={17} /><span>New thread</span><kbd>⌘ K</kbd></button>
+      <div className="nav-group"><span>Workspace</span>{nav.map((item) => <button className={view === item.id ? 'active' : ''} aria-current={view === item.id ? 'page' : undefined} onClick={() => chooseView(item.id)} title={item.label} key={item.id}><item.icon size={17} /><span>{item.label}</span>{item.id === 'runs' && activities.length > 0 && <b>{activities.length}</b>}</button>)}</div>
+      <div className="nav-group"><span>Manage</span><button onClick={() => { setMobileNav(false); setDrawerOpen(true) }} title="Connections"><Users size={17} /><span>Connections</span>{agentCount > 0 && <b>{agentCount}</b>}</button>{manage.map((item) => <button className={view === item.id ? 'active' : ''} aria-current={view === item.id ? 'page' : undefined} onClick={() => chooseView(item.id)} title={item.label} key={item.id}><item.icon size={17} /><span>{item.label}</span></button>)}</div>
+      <div className="sidebar-bottom"><button className={view === 'settings' ? 'active' : ''} onClick={() => chooseView('settings')} title="Settings"><Settings2 size={17} /><span>Settings</span></button><button className="profile" onClick={() => chooseView('settings')} title="Workspace settings"><div>R</div><span><strong>Local workspace</strong><small>{activeConnection}</small></span><ChevronDown size={15} /></button></div>
     </nav>
+    {mobileNav && <button className="nav-scrim" aria-label="Close navigation overlay" onClick={() => setMobileNav(false)} />}
 
     <main>
-      <header><button className="icon-button menu-button" onClick={() => setMobileNav(!mobileNav)}><Menu size={19} /></button><div><span className="eyebrow">Agentic workspace</span><h1>{view[0].toUpperCase() + view.slice(1)}</h1></div><div className="header-actions"><button className="search" onClick={() => setSearchOpen(true)}><Search size={17} /> Search <kbd>⌘ /</kbd></button><button className="icon-button" onClick={toggleTheme} aria-label="Toggle theme">{theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}</button><button className="agents-button" onClick={() => setDrawerOpen(true)}><span className="status-dot" /> {agentCount + 1} agent{agentCount ? 's' : ''} <ChevronDown size={14} /></button><button className="icon-button" onClick={() => setCanvasOpen(!canvasOpen)}>{canvasOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}</button></div></header>
+      <header className="app-header">
+        <button className="icon-button menu-button" onClick={() => setMobileNav(!mobileNav)} aria-label="Open navigation" aria-expanded={mobileNav}><Menu size={19} /></button>
+        <div className="breadcrumb"><span className="eyebrow">Agentic workspace</span><span className="breadcrumb-divider">/</span><h1>{view === 'chat' ? 'Chat & Live Canvas' : view[0].toUpperCase() + view.slice(1)}</h1></div>
+        <div className="header-actions">
+          <button className="search" onClick={() => setSearchOpen(true)} aria-label="Search messages and results"><Search size={16} /><span>Search workspace…</span><kbd>⌘ /</kbd></button>
+          <button className="agents-button" onClick={() => setDrawerOpen(true)} title="Select a connection"><Bot size={15} /><span>{activeConnection}</span><b>{agentCount} service{agentCount === 1 ? '' : 's'}</b><ChevronDown size={14} /></button>
+          <button className="icon-button" onClick={toggleTheme} aria-label="Toggle theme">{theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}</button>
+          {view === 'chat' && <button className="icon-button desktop-canvas-toggle" onClick={() => setCanvasOpen(!canvasOpen)} aria-label={canvasOpen ? 'Hide canvas' : 'Show canvas'} aria-expanded={canvasOpen}>{canvasOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}</button>}
+        </div>
+      </header>
 
-      {view === 'chat' ? <div className={`workspace ${canvasOpen ? '' : 'canvas-collapsed'}`}>
-        <section className="chat-panel">
-          {selectedAgent && <div className="agent-mode"><Bot size={14} /><span>Direct to <strong>{selectedAgent.name}</strong> via {selectedAgent.kind.toUpperCase()}</span><button onClick={newThread}><X size={13} /> Use coordinator</button></div>}
-          <div className="messages"><div className="day-label"><span>Today</span></div>{messages.map((message) => <article className={`message ${message.role}`} key={message.id}>{message.role === 'assistant' && <div className="message-avatar"><Sparkles size={16} /></div>}<div className="message-body"><div className="message-meta"><strong>{message.role === 'assistant' ? selectedAgent?.name || 'Relay' : 'You'}</strong><span>now</span>{message.role === 'assistant' && <em>{selectedAgent ? selectedAgent.kind.toUpperCase() : 'ADK'}</em>}</div><Markdown text={message.content || (message.pending ? 'Thinking…' : '')} /></div></article>)}{activities.length > 0 && <div className="activity-stack">{activities.map((item) => <div key={item.id}><span className={item.status}>{item.status === 'complete' ? <Check size={12} /> : <i />}</span><p><strong>{item.status === 'complete' ? 'Completed' : item.status === 'error' ? 'Failed' : item.status === 'cancelled' ? 'Cancelled' : 'Running'}:</strong> {item.name}</p></div>)}</div>}{!selectedAgent && messages.length === 1 && <div className="starters">{starters.map((starter) => <button key={starter} onClick={() => void send(starter)}>{starter}<ArrowUp size={14} /></button>)}</div>}</div>
-          <div className="composer-wrap">{selectedAgent && <ConnectionInput connection={selectedAgent} tool={tool} onTool={(value) => { setTool(value); setConfirmed(false) }} input={queryInput} onInput={(value) => { setQueryInput(value); setConfirmed(false) }} confirmed={confirmed} onConfirmed={setConfirmed} />}<div className="composer"><textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send() } }} placeholder={selectedAgent ? `Message ${selectedAgent.name}…` : 'Ask anything, or describe a dashboard…'} rows={1} /><div className="composer-actions"><div><button className="icon-button" onClick={() => fileInput.current?.click()} aria-label="Preview local file"><Paperclip size={18} /></button><input ref={fileInput} type="file" hidden onChange={(event) => attach(event.target.files?.[0])} /><div className="model-menu-wrap"><button className="model-pill" onClick={() => setModelOpen(!modelOpen)}><Bot size={15} /> {selectedAgent?.name || 'Gemini 3 Flash'} <ChevronDown size={13} /></button>{modelOpen && <div className="model-menu"><button onClick={() => { newThread(); setModelOpen(false) }}><Check size={13} /> Gemini 3 Flash · ADK</button><button onClick={() => { setDrawerOpen(true); setModelOpen(false) }}><Plus size={13} /> Connect agent or data service</button></div>}</div></div>{running ? <button className="send-button stop" onClick={stop} aria-label="Stop run"><CircleStop size={17} /></button> : <button className="send-button" aria-label="Send" disabled={!input.trim() && !selectedAgent} onClick={() => void send()}><ArrowUp size={18} /></button>}</div></div><small>Relay may make mistakes. Review important actions.</small></div>
-        </section>
-        {canvasOpen && <section className="canvas-panel"><div className="canvas-head"><div><AppWindow size={16} /><span>Canvas</span><i>Live</i></div><div><button onClick={() => setCanvasFull(!canvasFull)}>{canvasFull ? 'Exit preview' : 'Preview'}</button><div className="canvas-menu-wrap"><button onClick={() => setCanvasMenu(!canvasMenu)} aria-label="Canvas menu"><MoreHorizontal size={16} /></button>{canvasMenu && <div className="canvas-menu"><button onClick={exportCanvas}><Download size={13} /> Export JSON</button><button onClick={() => { setSurface(emptySurface); setResults([]); normalizer.a2ui.dispose(); setNormalizer(new ResultNormalizer()); setCanvasMenu(false) }}>Clear canvas</button></div>}</div></div></div><div className="canvas-title"><div><span className="eyebrow">Dynamic result</span><h2>{surface.surfaceId.replaceAll('-', ' ')}</h2><p>Native, safe rendering from the active agent.</p></div><span className="updated"><i /> {running ? 'Receiving results' : results.length ? 'Results available' : 'Awaiting results'}</span></div>{results.length === 0 && <p className="muted">Connect a service and run a query. Its results will appear here.</p>}{results.map((block) => <div className="canvas-result" key={block.id}><ResultRenderer block={block} onAction={handleSurfaceAction} /></div>)}<div className="canvas-foot"><span><ShieldIcon /> Dynamic protocol renderer</span><span>OpenAPI · MCP · AG-UI · A2A · Adapters</span></div></section>}
-      </div> : <WorkspacePage view={view} results={results} activities={activities} events={events} surface={surface} onSurface={setSurface} onChat={() => setView('chat')} theme={theme} onTheme={toggleTheme} onAction={handleSurfaceAction} />}
+      {view === 'chat' ? <>
+        <div className="mobile-panel-switch" role="group" aria-label="Workspace panel"><button aria-pressed={mobilePanel === 'chat'} onClick={() => setMobilePanel('chat')}><MessageSquare size={15} />Conversation</button><button aria-pressed={mobilePanel === 'canvas'} onClick={() => { setCanvasOpen(true); setMobilePanel('canvas') }}><LayoutDashboard size={15} />Canvas{results.length > 0 && <span>{results.length}</span>}</button></div>
+        <div className={`workspace ${canvasOpen ? '' : 'canvas-collapsed'} mobile-${mobilePanel}`}>
+          <section className="chat-panel" aria-label="Conversation">
+            <div className="thread-head"><span className="thread-dot" /><div><strong title={threadTitle}>{threadTitle}</strong><small><span>{selectedAgent ? 'Direct connection' : 'Gemini 3 Flash'}</span><span className="protocol-badge">{selectedAgent?.kind.toUpperCase() || 'ADK COORDINATOR'}</span></small></div><MessageSquare size={16} /></div>
+            {selectedAgent && <div className="agent-mode"><Bot size={14} /><span>Direct to <strong>{selectedAgent.name}</strong> via {selectedAgent.kind.toUpperCase()}</span><button onClick={newThread}><X size={13} /> Use coordinator</button></div>}
+            <div className="messages">
+              <div className="day-label"><span>Current conversation</span></div>
+              {messages.map((message) => <article className={`message ${message.role}`} key={message.id}>
+                <div className="message-avatar">{message.role === 'assistant' ? <Command size={16} /> : 'Y'}</div>
+                <div className="message-body"><div className="message-meta"><strong>{message.role === 'assistant' ? selectedAgent?.name || 'Relay' : 'You'}</strong>{message.role === 'assistant' && <em>{selectedAgent ? selectedAgent.kind.toUpperCase() : 'ADK'}</em>}{message.pending && <span className="streaming-label">Responding…</span>}</div><div className="message-content"><Markdown text={message.content || (message.pending ? 'Thinking…' : '')} /></div></div>
+              </article>)}
+              {activities.length > 0 && <details className="activity-stack" open><summary><Activity size={14} /><span>Execution trace</span><small>{activities.filter((item) => item.status === 'complete').length} / {activities.length} complete</small><ChevronDown size={14} /></summary><div className="trace-steps">{activities.map((item) => <div className="trace-step" key={item.id}><span className={`trace-state ${item.status}`}>{item.status === 'complete' ? <Check size={12} /> : item.status === 'running' ? <i /> : <X size={12} />}</span><p><strong>{item.status === 'complete' ? 'Completed' : item.status === 'error' ? 'Failed' : item.status === 'cancelled' ? 'Cancelled' : 'Running'}:</strong> {item.name}</p></div>)}</div></details>}
+              {!selectedAgent && messages.length === 1 && <div className="starters"><span className="eyebrow">Start with an idea</span>{starters.map((starter) => <button key={starter} onClick={() => void send(starter)}><span>{starter}</span><ArrowUp size={14} /></button>)}<button className="connect-starter" onClick={() => setDrawerOpen(true)}><span>Connect your own agent or service</span><Plus size={14} /></button></div>}
+            </div>
+            <div className="composer-wrap">
+              {selectedAgent && <ConnectionInput connection={selectedAgent} tool={tool} onTool={(value) => { setTool(value); setConfirmed(false) }} input={queryInput} onInput={(value) => { setQueryInput(value); setConfirmed(false) }} confirmed={confirmed} onConfirmed={setConfirmed} />}
+              <div className="composer"><textarea aria-label="Message" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send() } }} placeholder={selectedAgent ? `Message ${selectedAgent.name}…` : 'Ask anything, or describe a dashboard…'} rows={2} />
+                <div className="composer-actions"><div>
+                  <div className="model-menu-wrap"><button className="model-pill" onClick={() => setModelOpen(!modelOpen)} aria-expanded={modelOpen}><Bot size={14} /><span>{selectedAgent?.name || 'Gemini 3 Flash'}</span><ChevronDown size={13} /></button>{modelOpen && <div className="model-menu"><button onClick={() => { newThread(); setModelOpen(false) }}><Check size={13} /> Gemini 3 Flash · ADK</button><button onClick={() => { setDrawerOpen(true); setModelOpen(false) }}><Plus size={13} /> Connect agent or data service</button></div>}</div>
+                  <button className="icon-button" onClick={() => fileInput.current?.click()} aria-label="Preview local file" title="Preview a local file (not uploaded)"><Paperclip size={17} /></button><input ref={fileInput} type="file" hidden onChange={(event) => attach(event.target.files?.[0])} />
+                </div><div><span className="send-hint">Press ↵</span>{running ? <button className="send-button stop" onClick={stop} aria-label="Stop run"><CircleStop size={17} /></button> : <button className="send-button" aria-label="Send" disabled={!input.trim() && !selectedAgent} onClick={() => void send()}><ArrowUp size={18} /></button>}</div></div>
+              </div><div className="composer-foot"><span>RELAY WORKSPACE</span><small>Review important actions.</small></div>
+            </div>
+          </section>
+          {canvasOpen && <section className="canvas-panel" aria-label="Live canvas">
+            <div className="canvas-head"><div className="canvas-heading"><span className="canvas-icon"><AppWindow size={17} /></span><strong>Live canvas</strong><span className={`canvas-status ${running ? 'running' : ''}`} role="status">{running ? 'Receiving' : results.length ? 'Ready' : 'Standby'}</span></div><div className="canvas-actions"><button className="icon-button" onClick={exportCanvas} aria-label="Export canvas JSON" title="Export canvas JSON"><Download size={16} /></button><button className="icon-button" onClick={() => setCanvasFull(!canvasFull)} aria-label={canvasFull ? 'Exit preview' : 'Preview'} title={canvasFull ? 'Exit preview' : 'Expand canvas'}>{canvasFull ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button><div className="canvas-menu-wrap"><button className="icon-button" onClick={() => setCanvasMenu(!canvasMenu)} aria-label="Canvas menu" aria-expanded={canvasMenu}><MoreHorizontal size={16} /></button>{canvasMenu && <div className="canvas-menu"><button onClick={exportCanvas}><Download size={13} /> Export JSON</button><button onClick={() => { setSurface(emptySurface); setResults([]); normalizer.a2ui.dispose(); setNormalizer(new ResultNormalizer()); setCanvasMenu(false) }}>Clear canvas</button></div>}</div></div></div>
+            <div className="canvas-toolbar"><div className="view-switch" role="group" aria-label="Canvas view"><button aria-pressed={canvasMode === 'visual'} onClick={() => setCanvasMode('visual')}><LayoutDashboard size={13} />Visual canvas</button><button aria-pressed={canvasMode === 'payload'} onClick={() => setCanvasMode('payload')}><FileText size={13} />Raw payload</button></div><span>{results.length} result{results.length === 1 ? '' : 's'}</span></div>
+            <div className="canvas-body">
+              <div className="canvas-title"><span className="eyebrow">{results.length ? 'Generated results' : 'Your ideas, rendered'}</span><h2>{results.length ? canvasTitle : 'Give your next answer a canvas.'}</h2><p>{results.length ? `Results from ${activeConnection}` : 'Dashboards, forms, and insights. Built by your agents, right here.'}</p></div>
+              {canvasMode === 'payload' ? <div className="canvas-payload"><p>Current results and A2UI state</p><pre tabIndex={0}>{JSON.stringify({ results, surface, a2ui: normalizer.a2ui.export() }, null, 2)}</pre></div> : <>
+                {results.length === 0 && <div className="canvas-empty"><div className="canvas-empty-icon"><LayoutDashboard size={28} /></div><strong>Ready for your first result</strong><p>Connect a service or ask the coordinator to create something. Results appear as they arrive.</p><button className="primary-action" onClick={() => setDrawerOpen(true)}><Plus size={15} />Connect a service</button><div className="canvas-capabilities"><span><LayoutDashboard size={14} />Dashboards</span><span><FileText size={14} />Forms & files</span><span><Activity size={14} />Live results</span></div></div>}
+                {results.map((block) => <div className="canvas-result" key={block.id}><ResultRenderer block={block} onAction={handleSurfaceAction} /></div>)}
+              </>}
+            </div>
+            <div className="canvas-foot"><span><ShieldIcon />Declarative rendering</span><span>A2UI · AG-UI · MCP · A2A</span></div>
+          </section>}
+        </div>
+      </> : <WorkspacePage view={view} results={results} activities={activities} events={events} surface={surface} onSurface={setSurface} onChat={() => setView('chat')} theme={theme} onTheme={toggleTheme} onAction={handleSurfaceAction} />}
     </main>
 
     {drawerOpen && <AgentDrawer onClose={() => setDrawerOpen(false)} onUseAgent={selectAgent} onChanged={setAgentCount} />}
     {drawerOpen && <button className="scrim" onClick={() => setDrawerOpen(false)} aria-label="Close drawer" />}
-    {searchOpen && <div className="modal-backdrop" onClick={() => setSearchOpen(false)}><section className="search-modal" onClick={(event) => event.stopPropagation()}><div><Search size={18} /><input autoFocus value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search messages and results" /><button className="icon-button" onClick={() => setSearchOpen(false)}><X size={16} /></button></div><div className="search-results">{searched && searchItems.length === 0 && <p>No matching workspace content.</p>}{searchItems.map((item, index) => <button onClick={item.action} key={index}>{item.label}</button>)}</div></section></div>}
+    {searchOpen && <div className="modal-backdrop" onClick={() => setSearchOpen(false)}><section className="search-modal" role="dialog" aria-modal="true" aria-label="Search workspace" onClick={(event) => event.stopPropagation()}><div><Search size={18} /><input autoFocus aria-label="Search messages and results" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search messages and results" /><button className="icon-button" onClick={() => setSearchOpen(false)} aria-label="Close search"><X size={16} /></button></div><div className="search-results">{!searched && <p>Find something in this conversation or its results.</p>}{searched && searchItems.length === 0 && <p>No matching workspace content.</p>}{searchItems.map((item, index) => <button onClick={item.action} key={index}>{item.label}</button>)}</div></section></div>}
   </div></A2UIContext.Provider>
 }
 

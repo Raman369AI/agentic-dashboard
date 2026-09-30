@@ -1,0 +1,88 @@
+import { expect, test } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
+
+test.use({ reducedMotion: 'reduce' })
+
+test('Stitch workspace keeps navigation, themes, and connection selection usable', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Chat & Live Canvas' })).toBeVisible()
+  await expect(page.getByText('Ready for your first result')).toBeVisible()
+  await page.screenshot({ path: test.info().outputPath('workspace-dark.png') })
+
+  for (const name of ['Dashboards', 'Runs', 'Artifacts', 'Tools', 'Activity', 'Settings']) {
+    await page.getByRole('navigation').getByRole('button', { name, exact: true }).click()
+    await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible()
+  }
+  await page.getByRole('button', { name: 'Toggle theme' }).click()
+  await expect(page.locator('.app-shell')).toHaveClass(/light/)
+  await page.reload()
+  await expect(page.locator('.app-shell')).toHaveClass(/light/)
+  await page.screenshot({ path: test.info().outputPath('workspace-light.png') })
+
+  await page.getByRole('button', { name: 'Gemini 3 Flash', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Connect agent or data service' })).toBeVisible()
+  await page.getByRole('button', { name: 'Connect agent or data service' }).click()
+  await expect(page.getByRole('dialog', { name: 'Connections' })).toBeVisible()
+  await page.screenshot({ path: test.info().outputPath('connections-light.png') })
+})
+
+test('canvas payload, export, preview, and reset use real connection results', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.goto('/')
+  await page.getByRole('button', { name: /^Connections/ }).click()
+  const drawer = page.getByRole('dialog', { name: 'Connections' })
+  await drawer.getByLabel('Connection type').selectOption('agui')
+  await drawer.getByLabel('Name', { exact: true }).fill('Canvas verification')
+  await drawer.getByLabel('Endpoint URL', { exact: true }).fill('http://127.0.0.1:9101/ag-ui')
+  await drawer.getByRole('button', { name: 'Add connection' }).click()
+  await drawer.locator('article').filter({ hasText: 'Canvas verification' }).getByRole('button', { name: 'Use', exact: true }).click()
+  await page.getByPlaceholder('Message Canvas verification…').fill('Show the dashboard')
+  await page.getByRole('button', { name: 'Send', exact: true }).click()
+  const canvas = page.locator('.canvas-panel')
+  await expect(canvas.getByText('Active accounts')).toBeVisible()
+  await expect(canvas.getByRole('status')).toHaveText('Ready')
+  await page.screenshot({ path: test.info().outputPath('workspace-results.png') })
+
+  await page.getByRole('button', { name: 'Raw payload', exact: true }).click()
+  await expect(canvas.locator('.canvas-payload')).toContainText('Active accounts')
+  const downloadEvent = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Export canvas JSON', exact: true }).click()
+  const download = await downloadEvent
+  const exported = JSON.parse(await readFile((await download.path())!, 'utf8'))
+  expect(exported.results.some((result: { title?: string }) => result.title === 'Active accounts')).toBe(true)
+  await page.getByRole('button', { name: 'Preview', exact: true }).click()
+  await expect(page.getByRole('navigation')).toBeHidden()
+  await page.getByRole('button', { name: 'Exit preview', exact: true }).click()
+  await expect(page.getByRole('navigation')).toBeVisible()
+  await page.getByRole('button', { name: /New thread/ }).click()
+  await expect(page.getByRole('button', { name: 'Visual canvas', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByText('Ready for your first result')).toBeVisible()
+  await expect(canvas.getByText('Active accounts')).toHaveCount(0)
+})
+
+test('mobile switches panels without horizontal overflow and keeps navigation reachable', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  const panels = page.getByRole('group', { name: 'Workspace panel' })
+  await expect(page.locator('.chat-panel')).toBeVisible()
+  await expect(page.locator('.canvas-panel')).toBeHidden()
+  await page.screenshot({ path: test.info().outputPath('mobile-chat.png') })
+  await panels.getByRole('button', { name: 'Canvas', exact: true }).click()
+  await expect(page.locator('.canvas-panel')).toBeVisible()
+  await expect(page.locator('.chat-panel')).toBeHidden()
+  await page.getByRole('button', { name: 'Preview', exact: true }).click()
+  await expect(page.locator('.canvas-panel')).toBeVisible()
+  await page.getByRole('button', { name: 'Exit preview', exact: true }).click()
+  await page.screenshot({ path: test.info().outputPath('mobile-canvas.png') })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+
+  await page.getByRole('button', { name: 'Open navigation' }).click()
+  await page.getByRole('button', { name: /^Connections/ }).click()
+  const drawer = page.getByRole('dialog', { name: 'Connections' })
+  await expect(drawer).toBeVisible()
+  await expect(page.locator('.sidebar')).not.toHaveClass(/mobile-open/)
+  await drawer.getByRole('button', { name: 'Close connections' }).click()
+  await panels.getByRole('button', { name: 'Conversation', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeVisible()
+})
