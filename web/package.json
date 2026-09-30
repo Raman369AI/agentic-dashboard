@@ -16,7 +16,7 @@
     "date-fns": "^4.4.0",
     "eventsource-parser": "^4.1.1",
     "fast-json-patch": "^3.1.1",
-    "lucide-react": "^1.47.0",
+    "lucide-react": "^1.48.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-markdown": "^10.1.0",
